@@ -220,38 +220,55 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 
 	modual_sel = readl(addrs.regs_macc + 0);
 
-	/* case for VE 1633 and newer */
-	if (modual_sel&(3<<6)) {
-		modual_sel &= ~(0xF);
-		if (modual_sel&(1<<7)) {
+	/* ENCODER (EN) case for VE 1633 and newer */
+	if ((modual_sel&(3<<6)) || (modual_sel == 0xB)) {
+
+		if (modual_sel == 0xB) {
 			/*avc enc*/
-			ve_int_status_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x1c);
-			ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
+			ve_int_status_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x1c);
+    		ve_int_ctrl_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x14);
 			interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x7);
 			status = readl((void*)ve_int_status_reg);
 			status &= 0xf;
 		} else {
-			/*isp*/
-			ve_int_status_reg = (ulong)(addrs.regs_macc + 0xa00 + 0x10);
-			ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xa00 + 0x08);
-			interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x1);
-			status = readl((void*)ve_int_status_reg);
-			status &= 0x1;
+			modual_sel &= ~(0xF);
+
+			if (modual_sel&(1<<7)) {
+				/*avc enc*/
+				ve_int_status_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x1c);
+				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
+				interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x7);
+				status = readl((void*)ve_int_status_reg);
+				status &= 0xf;
+			} else {
+				/*isp*/
+				ve_int_status_reg = (ulong)(addrs.regs_macc + 0xa00 + 0x10);
+				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xa00 + 0x08);
+				interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x1);
+				status = readl((void*)ve_int_status_reg);
+				status &= 0x1;
+			}
 		}
 
 		/*modify by fangning 2013-05-22*/
 		if (status && interrupt_enable) {
 			/*disable interrupt*/
-			/*avc enc*/
-			if (modual_sel&(1<<7)) {
-				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
+			if (modual_sel == 0xB) {
+				ve_int_ctrl_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x14);
 				val = readl((void*)ve_int_ctrl_reg);
-				writel(val & (~0x7), (void*)ve_int_ctrl_reg);
+				writel(val & (~0xf), (void*)ve_int_ctrl_reg);
 			} else {
-				/*isp*/
-				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xa00 + 0x08);
-				val = readl((void*)ve_int_ctrl_reg);
-				writel(val & (~0x1), (void*)ve_int_ctrl_reg);
+				/*avc enc*/
+				if (modual_sel&(1<<7)) {
+					ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
+					val = readl((void*)ve_int_ctrl_reg);
+					writel(val & (~0x7), (void*)ve_int_ctrl_reg);
+				} else {
+					/*isp*/
+					ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xa00 + 0x08);
+					val = readl((void*)ve_int_ctrl_reg);
+					writel(val & (~0x1), (void*)ve_int_ctrl_reg);
+				}
 			}
 			/*hx modify 2011-8-1 16:08:47*/
 			cedar_devp->en_irq_value = 1;
@@ -285,9 +302,9 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 	}
 #endif
 
-	/* case for all VE versions */
+	/* DECODER (DE) case for all VE versions */
 	modual_sel &= 0xf;
-	if((modual_sel<=4) || (modual_sel == 0xB)) {
+	if((modual_sel<=4) /*|| (modual_sel == 0xB)*/) {
 		/*estimate Which video format*/
 		switch (modual_sel)
 		{
@@ -322,13 +339,13 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0x500 + 0x30);
 				interrupt_enable = readl((void*)ve_int_ctrl_reg) & (0xf);
 				break;
-
+#if 0
 			case 0xB: /*AVC (h264 encoder)*/
 				ve_int_status_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x1c);
     			ve_int_ctrl_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x14);
 				interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x7);
 				break;	
-
+#endif
 			default:   
 				ve_int_status_reg = (ulong)(addrs.regs_macc + 0x100 + 0x1c);
 				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0x100 + 0x14);
