@@ -222,6 +222,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 
 	/* case for VE 1633 and newer */
 	if (modual_sel&(3<<6)) {
+		modual_sel &= ~(0xF);
 		if (modual_sel&(1<<7)) {
 			/*avc enc*/
 			ve_int_status_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x1c);
@@ -259,6 +260,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 			//printk("Video interrupt occurs EN!!!\n");
 			wake_up_interruptible(&wait_ve);
 		}
+		return IRQ_HANDLED;
 	}
 
 #if ((defined CONFIG_ARCH_SUN8IW8P1) || (defined CONFIG_ARCH_SUN50I))
@@ -355,7 +357,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 			wake_up_interruptible(&wait_ve);
 		}
 	}
-
+	//printk("%08X\n", modual_sel);
 	return IRQ_HANDLED;
 }
 
@@ -1335,7 +1337,7 @@ static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
         vma->vm_flags |= /* VM_RESERVED | */VM_IO;
 
         /* Select uncached access. */
-        //vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+        vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
         if (remap_pfn_range(vma, vma->vm_start, temp_pfn,
                             vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
