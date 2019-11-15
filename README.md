@@ -1,5 +1,8 @@
 sunxi cedar kernel module - targeting mainline kernel - linux-4.11.y and higher
 
+### UPD
+MMAP cached area and cache cleaning support added (cache-v7.S)
+mmap cached area increases frame rate twice against uncached
 
 Module compilation - arm7v or aarch64 e.g.:
 * make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnueabihf- KDIR="<kernel_dir>" -f Makefile.linux
