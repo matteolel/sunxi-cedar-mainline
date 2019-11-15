@@ -61,6 +61,12 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_reserved_mem.h>
 
+#define MMAP_UNCACHABLE
+
+#ifndef MMAP_UNCACHABLE
+extern int flush_clean_user_range(long start, long end);
+#endif
+
 struct regulator *regu;
 
 //#define USE_ION
@@ -884,6 +890,18 @@ static long compat_cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 			{
 				return 0;
 			}
+		case IOCTL_FLUSH_CACHE:
+#if !defined(MMAP_UNCACHABLE)		
+			{
+				struct cedarv_cache_range cache_range;
+				if(copy_from_user(&cache_range, (void __user*)arg, sizeof(struct cedarv_cache_range))){
+					printk("IOCTL_FLUSH_CACHE copy_from_user fail\n");
+					return -EFAULT;
+				}
+				flush_clean_user_range(cache_range.start, cache_range.end);
+			}
+#endif			
+			break;	
 		case IOCTL_SET_REFCOUNT:
 			cedar_devp->ref_count = (int)arg;
 			break;
@@ -1183,6 +1201,18 @@ static long cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 			{        	
 				return 0;
 			}
+		case IOCTL_FLUSH_CACHE:
+#if !defined(MMAP_UNCACHABLE)		
+			{
+				struct cedarv_cache_range cache_range;
+				if(copy_from_user(&cache_range, (void __user*)arg, sizeof(struct cedarv_cache_range))){
+					printk("IOCTL_FLUSH_CACHE copy_from_user fail\n");
+					return -EFAULT;
+				}
+				flush_clean_user_range(cache_range.start, cache_range.end);
+			}
+#endif			
+			break;		
 		case IOCTL_SET_REFCOUNT:
 			cedar_devp->ref_count = (int)arg;
 			break;
@@ -1353,9 +1383,10 @@ static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
         /* Set reserved and I/O flag for the area. */
         vma->vm_flags |= /* VM_RESERVED | */VM_IO;
 
+#if defined(MMAP_UNCACHABLE)
         /* Select uncached access. */
         vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
+#endif
         if (remap_pfn_range(vma, vma->vm_start, temp_pfn,
                             vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
             return -EAGAIN;
