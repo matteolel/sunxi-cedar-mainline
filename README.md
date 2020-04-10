@@ -1,43 +1,43 @@
-sunxi cedar kernel module - targeting mainline kernel - linux-4.11.y and higher
+# sunxi cedar kernel module
 
-### UPD
-MMAP cached area and cache cleaning support added (cache-v7.S)
-mmap cached area increases frame rate twice against uncached
+Targeting mainline kernel - linux-4.11.y and higher.
 
-Module compilation - arm7v or aarch64 e.g.:
-* make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnueabihf- KDIR="<kernel_dir>" -f Makefile.linux
-* make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR="<kernel_dir>" -f Makefile.linux
+## Changes
 
-### UPD
+* reserved memory CMA below 256M is used for **dma_alloc_coherent** (see the device tree file) instead of ION allocator.
+* mmap has been modified to support MACC and DMA memory.
+* interrupt status code 0xB (AVC (h264 encoder)) has been added for Allwinner A20.
+* video engine has been added to the device tree.
+* MMAP cached area and cache cleaning support has been added (cache-v7.S). It increases the framerate twice the uncached one.
 
-The driver has been modified for linux mainline kernel 4.19 and successfully tested.
+## Building
 
-##### Modifications
-* reserved memory CMA below 256M is used for **dma_alloc_coherent** (see the device tree file) instead of ION allocator
-* mmap has been modified to support MACC and DMA memory
-* interrupt status code 0xB (AVC (h264 encoder)) has been added for Allwinner A20
-* video engine has been added to the device tree
+The first method quickly produces `.ko` module without building anything else.
 
-ve: video-engine@01c0e000 {
-      compatible = "allwinner,sunxi-cedar-ve";
-      reg = <0x01c0e000 0x1000>,
-            <0x01c00000 0x10>,
-            <0x01c20000 0x800>;
-      memory-region = <&cma_pool>;      
-      syscon = <&syscon>;         
-      clocks = <&ccu CLK_AHB_VE>, <&ccu CLK_VE>, 
-               <&ccu CLK_DRAM_VE>;
-      clock-names = "ahb", "mod", "ram";
-      resets = <&ccu RST_VE>;
-      interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
-  };
+Copy your `.config` file to the root of this repository and then run:
 
+### On the target machine
 
-Don't forget to put this code into your **dts** file
+```
+make KERNEL_SOURCE=.../linux-source
+```
 
-&ve {
-    status = "okay";
-};
+### On the host machine (cross-compilation)
 
+```
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KERNEL_SOURCE=.../linux-source
+```
 
-Sources from other repositories and updated.
+Or whatever your `CROCC_COMPILE` prefix is.
+
+### Other build option
+
+Remove or rename `Makefile`:
+```
+mv Makefile Makefile.bak
+```
+
+And then execute:
+```
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=.../linux-source -f Makefile.linux
+```

@@ -5,7 +5,6 @@
 *.cmd
 *.ko
 .tmp*
-Makefile
 Module.symvers
 modules.order
-sunxi_cedar.mod.c
+cedar_ve.mod*
