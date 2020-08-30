@@ -61,6 +61,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/of_reserved_mem.h>
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,1,0)
+#include <linux/soc/sunxi/sunxi_sram.h>
+#endif
+
 #define MMAP_UNCACHABLE
 
 #ifndef MMAP_UNCACHABLE
@@ -226,6 +230,10 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 
 	modual_sel = readl(addrs.regs_macc + 0);
 
+	//printk("[cedar ISR]: modual_sel %08x\n", modual_sel);
+
+//	return IRQ_HANDLED;
+//001300cb
 	/* ENCODER (EN) case for VE 1633 and newer */
 	if ((modual_sel&(3<<6)) || (modual_sel == 0xB)) {
 
@@ -241,6 +249,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 
 			if (modual_sel&(1<<7)) {
 				/*avc enc*/
+				//printk("[cedrus]: AVC interrupt!!!\n");
 				ve_int_status_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x1c);
 				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
 				interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x7);
@@ -266,6 +275,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 			} else {
 				/*avc enc*/
 				if (modual_sel&(1<<7)) {
+					//printk("[cedrus]: Read AVC interrupt!!!\n");
 					ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
 					val = readl((void*)ve_int_ctrl_reg);
 					writel(val & (~0x7), (void*)ve_int_ctrl_reg);
@@ -280,7 +290,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 			cedar_devp->en_irq_value = 1;
 			cedar_devp->en_irq_flag = 1;
 			/*any interrupt will wake up wait queue*/
-			//printk("Video interrupt occurs EN!!!\n");
+			//printk("[cedrus]: Video interrupt occurs EN!!!\n");
 			wake_up_interruptible(&wait_ve);
 		}
 		return IRQ_HANDLED;
@@ -1676,9 +1686,19 @@ static int cedardev_init(struct platform_device *pdev)
 	  cedar_devp->syscon = NULL;
 	} else {
 		// remap SRAM C1 to the VE
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,1,0)	
+		int ret = sunxi_sram_claim(cedar_devp->dev);
+		if (ret) {
+			dev_err(cedar_devp->dev, "Failed to claim SRAM\n");
+	  		return -EFAULT;
+		}
+		printk("[cedar]: Success claim SRAM\n");
+#else 
+
 	  	regmap_write_bits(cedar_devp->syscon, SYSCON_SRAM_CTRL_REG0,
 					      SYSCON_SRAM_C1_MAP_VE,
 					      SYSCON_SRAM_C1_MAP_VE);
+#endif
 	}
 
 	cedar_devp->ahb_clk = devm_clk_get(cedar_devp->dev, "ahb");
