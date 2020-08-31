@@ -36,9 +36,9 @@ enum IOCTL_CMD {
 	IOCTL_GET_REFCOUNT,
 };
 
-struct cedarv_env_infomation{
-	unsigned int phymem_start;
-	int  phymem_total_size;
+struct cedarv_env_infomation {
+	unsigned long  phymem_start;
+	unsigned long  phymem_total_size;
 	unsigned long  address_macc;
 };
 
@@ -76,9 +76,9 @@ struct cedarv_regop {
 };
 
 struct cedarv_env_infomation_compat {
-	unsigned int phymem_start;
-	int  phymem_total_size;
-	u32  address_macc;
+	unsigned long  phymem_start;
+	unsigned long  phymem_total_size;
+	unsigned long  address_macc;
 };
 
 struct __cedarv_task_compat {

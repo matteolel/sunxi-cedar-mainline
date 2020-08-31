@@ -239,8 +239,8 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 
 		if (modual_sel == 0xB) {
 			/*avc enc*/
-			ve_int_status_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x1c);
-    		ve_int_ctrl_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x14);
+			ve_int_status_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x1c);
+    		ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
 			interrupt_enable = readl((void*)ve_int_ctrl_reg) &(0x7);
 			status = readl((void*)ve_int_status_reg);
 			status &= 0xf;
@@ -269,7 +269,7 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 		if (status && interrupt_enable) {
 			/*disable interrupt*/
 			if (modual_sel == 0xB) {
-				ve_int_ctrl_reg = (unsigned int)(addrs.regs_macc + 0xb00 + 0x14);
+				ve_int_ctrl_reg = (ulong)(addrs.regs_macc + 0xb00 + 0x14);
 				val = readl((void*)ve_int_ctrl_reg);
 				writel(val & (~0xf), (void*)ve_int_ctrl_reg);
 			} else {
@@ -887,9 +887,9 @@ static long compat_cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 				env_info.phymem_total_size = 0;//ve_size = 0x04000000 
 				env_info.address_macc = 0;
 #else				
-				env_info.phymem_start = (unsigned int)phys_to_virt(cedar_devp->ve_start); // do not use this interface ,ve get phy mem form ion now
-				env_info.phymem_total_size = cedar_devp->ve_size;
-				env_info.address_macc = (unsigned int) cedar_devp->iomap_addrs.regs_macc;
+				env_info.phymem_start = (unsigned long)phys_to_virt(cedar_devp->ve_start); // do not use this interface ,ve get phy mem form ion now
+				env_info.phymem_total_size = (unsigned long) cedar_devp->ve_size;
+				env_info.address_macc = (unsigned long) cedar_devp->iomap_addrs.regs_macc;
 #endif	
 				if (copy_to_user((char *)arg, &env_info,
 					sizeof(struct cedarv_env_infomation_compat)))
@@ -1199,9 +1199,9 @@ static long cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 				env_info.phymem_total_size = 0;//ve_size = 0x04000000 
 				env_info.address_macc = 0;
 #else				
-				env_info.phymem_start = (unsigned int)phys_to_virt(cedar_devp->ve_start); // do not use this interface ,ve get phy mem form ion now
-				env_info.phymem_total_size = cedar_devp->ve_size;
-				env_info.address_macc = (unsigned int) cedar_devp->iomap_addrs.regs_macc;
+				env_info.phymem_start = (unsigned long)phys_to_virt(cedar_devp->ve_start); // do not use this interface ,ve get phy mem form ion now
+				env_info.phymem_total_size = (unsigned long) cedar_devp->ve_size;
+				env_info.address_macc = (unsigned long) cedar_devp->iomap_addrs.regs_macc;
 #endif				
 				if (copy_to_user((char *)arg, &env_info, sizeof(struct cedarv_env_infomation)))
 					return -EFAULT;
@@ -1374,14 +1374,14 @@ static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
 static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
 {
     unsigned long temp_pfn;
-    unsigned int  VAddr;
+    unsigned long  VAddr;
 	struct iomap_para addrs;
 
 	unsigned int io_ram = 0;
     VAddr = vma->vm_pgoff << 12;
 	addrs = cedar_devp->iomap_addrs;
 
-    if (VAddr == (unsigned int)addrs.regs_macc) {
+    if (VAddr == (unsigned long)addrs.regs_macc) {
         temp_pfn = MACC_REGS_BASE >> 12;
         io_ram = 1;
     } else {
@@ -1798,8 +1798,14 @@ static int cedardev_init(struct platform_device *pdev)
 		return -ENODEV;
 	}
 	cedar_devp->ve_start = cedar_devp->ve_start_pa;
+#ifndef __aarch64__
+	printk("[cedar]: memory allocated at address PA: %08lX, VA: %08lX\n", 
+		cedar_devp->ve_start, (ulong)cedar_devp->ve_start_virt);
+#else 
+	printk("[cedar]: memory allocated at PA: %016lX, VA: %016lX, CONV: %016lX\n", 
+		cedar_devp->ve_start, (ulong)cedar_devp->ve_start_virt, (ulong) phys_to_virt(cedar_devp->ve_start));
+#endif
 
-	printk("[cedar]: memory allocated at address %08lX\n", cedar_devp->ve_start);
 #endif
 
 	printk("[cedar]: install end!!!\n");
