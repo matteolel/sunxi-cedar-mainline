@@ -1823,11 +1823,11 @@ static void cedardev_exit(void)
 	//	iounmap(cedar_devp->iomap_addrs.regs_avs);
 
 	if (cedar_devp->sram_bass_vir) iounmap(cedar_devp->sram_bass_vir);
-        if (cedar_devp->clk_bass_vir)  iounmap(cedar_devp->clk_bass_vir);
+    if (cedar_devp->clk_bass_vir)  iounmap(cedar_devp->clk_bass_vir);
 
 #if !defined(USE_ION)
     if (cedar_devp->ve_start_virt)
-    	dma_free_coherent(NULL, cedar_devp->ve_size, cedar_devp->ve_start_virt, cedar_devp->ve_start);      	 
+    	dma_free_coherent(cedar_devp->dev, cedar_devp->ve_size, cedar_devp->ve_start_virt, cedar_devp->ve_start_pa);      	 
 
 # if defined(CONFIG_OF)
 	of_reserved_mem_device_release(cedar_devp->dev);
