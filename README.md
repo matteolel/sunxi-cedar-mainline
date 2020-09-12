@@ -41,3 +41,45 @@ And then execute:
 ```
 make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- KDIR=.../linux-source -f Makefile.linux
 ```
+
+## UPD
+For Linux kernel >= 5.x nodes **syscon** and **ve** must be chanded in **.dts** file:
+```
+syscon: system-control@1c00000 {
+			compatible = "allwinner,sun8i-h3-system-control","syscon";
+			reg = <0x01c00000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			sram_c: sram@1d00000 {
+				compatible = "mmio-sram";
+				reg = <0x01d00000 0x80000>;
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges = <0 0x01d00000 0x80000>;
+
+				ve_sram: sram-section@0 {
+					compatible = "allwinner,sun8i-h3-sram-c1",
+					 "allwinner,sun4i-a10-sram-c1";
+					reg = <0x000000 0x80000>;
+				};
+			};
+		};
+```
+```
+ve: video-engine@01c0e000 {
+			compatible = "allwinner,sunxi-cedar-ve";
+			reg = <0x01c0e000 0x1000>,
+			          <0x01c00000 0x10>,
+			          <0x01c20000 0x800>;
+			memory-region = <&cma_pool>;
+			syscon = <&syscon>;
+			clocks = <&ccu CLK_BUS_VE>, <&ccu CLK_VE>,
+			         <&ccu CLK_DRAM_VE>;
+			clock-names = "ahb", "mod", "ram";
+			resets = <&ccu RST_BUS_VE>;
+			interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+			allwinner,sram = <&ve_sram 1>;
+		};
+```
