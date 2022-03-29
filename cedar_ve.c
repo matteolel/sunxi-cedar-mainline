@@ -230,10 +230,11 @@ static irqreturn_t VideoEngineInterupt(int irq, void *dev)
 
 	modual_sel = readl(addrs.regs_macc + 0);
 
-	//printk("[cedar ISR]: modual_sel %08x\n", modual_sel);
+	//printk("!!!!!!!!! [cedar ISR]: modual_sel %08x\n", modual_sel);
 
-//	return IRQ_HANDLED;
+	//return IRQ_HANDLED;
 //001300cb
+//001300c1
 	/* ENCODER (EN) case for VE 1633 and newer */
 	if ((modual_sel&(3<<6)) || (modual_sel == 0xB)) {
 
@@ -908,7 +909,9 @@ static long compat_cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 					printk("IOCTL_FLUSH_CACHE copy_from_user fail\n");
 					return -EFAULT;
 				}
+#ifndef __aarch64__				
 				flush_clean_user_range(cache_range.start, cache_range.end);
+#endif				
 			}
 #endif			
 			break;	
@@ -1078,6 +1081,8 @@ static long cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 				cedar_devp->de_irq_value = 1;
 			spin_unlock_irqrestore(&cedar_spin_lock, flags);
 
+			//printk("[cedar-ve]: ioctl IOCTL_WAIT_VE_DE\n");
+
 			wait_event_interruptible_timeout(wait_ve, cedar_devp->de_irq_flag, ve_timeout*HZ);            
 			cedar_devp->de_irq_flag = 0;	
 
@@ -1091,6 +1096,8 @@ static long cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 			if (cedar_devp->en_irq_flag)
 				cedar_devp->en_irq_value = 1;
 			spin_unlock_irqrestore(&cedar_spin_lock, flags);
+
+			//printk("[cedar-ve]: ioctl IOCTL_WAIT_VE_EN\n");
 
 			wait_event_interruptible_timeout(wait_ve, cedar_devp->en_irq_flag, ve_timeout*HZ);            
 			cedar_devp->en_irq_flag = 0;	
@@ -1219,7 +1226,9 @@ static long cedardev_ioctl(struct file *filp, u32 cmd, unsigned long arg)
 					printk("IOCTL_FLUSH_CACHE copy_from_user fail\n");
 					return -EFAULT;
 				}
+#ifndef __aarch64__				
 				flush_clean_user_range(cache_range.start, cache_range.end);
+#endif				
 			}
 #endif			
 			break;		
@@ -1371,21 +1380,24 @@ static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0; 
 }
 #else
+
 static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
 {
     unsigned long temp_pfn;
     unsigned long  VAddr;
-	struct iomap_para addrs;
+	  struct iomap_para addrs;
 
-	unsigned int io_ram = 0;
-    VAddr = vma->vm_pgoff << 12;
-	addrs = cedar_devp->iomap_addrs;
+	  unsigned int io_ram = 0;
+    VAddr = vma->vm_pgoff << PAGE_SHIFT;
+	  addrs = cedar_devp->iomap_addrs;
+	  size_t size = vma->vm_end - vma->vm_start;
+
 
     if (VAddr == (unsigned long)addrs.regs_macc) {
-        temp_pfn = MACC_REGS_BASE >> 12;
+        temp_pfn = MACC_REGS_BASE >> PAGE_SHIFT;
         io_ram = 1;
     } else {
-        temp_pfn = (__pa(vma->vm_pgoff << 12))>>12;
+        temp_pfn = (__pa(vma->vm_pgoff << PAGE_SHIFT)) >> PAGE_SHIFT;
         io_ram = 0;
     }
 
@@ -1395,12 +1407,17 @@ static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
 
 #if defined(MMAP_UNCACHABLE)
         /* Select uncached access. */
-        vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-#endif
+    	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+# ifndef __aarch64__    	
         if (remap_pfn_range(vma, vma->vm_start, temp_pfn,
-                            vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
+                            size, vma->vm_page_prot)) {
             return -EAGAIN;
         }
+# else        
+        dma_mmap_coherent(cedar_devp->dev, vma, cedar_devp->ve_start_virt, cedar_devp->ve_start_pa, size);
+# endif        
+#endif
+        
     } else {
         /* Set reserved and I/O flag for the area. */
         vma->vm_flags |= /*VM_RESERVED |*/ VM_IO;
@@ -1408,7 +1425,7 @@ static int cedardev_mmap(struct file *filp, struct vm_area_struct *vma)
         vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
         if (io_remap_pfn_range(vma, vma->vm_start, temp_pfn,
-                               vma->vm_end - vma->vm_start, vma->vm_page_prot)) {
+                               size, vma->vm_page_prot)) {
             return -EAGAIN;
         }
     }
@@ -1788,7 +1805,12 @@ static int cedardev_init(struct platform_device *pdev)
 
 #if !defined(USE_ION)
 	cedar_devp->ve_size = 80 * SZ_1M;
-	dma_set_coherent_mask(cedar_devp->dev, 0xFFFFFFFF);
+	ret = dma_set_coherent_mask(cedar_devp->dev, DMA_BIT_MASK(32));
+	if (ret) {
+		dev_err(cedar_devp->dev, "DMA enable failed\n");
+		return ret;
+	}
+
 	cedar_devp->ve_start_virt = dma_alloc_coherent(cedar_devp->dev, cedar_devp->ve_size,
 												   &cedar_devp->ve_start_pa,
 												   GFP_KERNEL | GFP_DMA);
@@ -1803,7 +1825,15 @@ static int cedardev_init(struct platform_device *pdev)
 		cedar_devp->ve_start, (ulong)cedar_devp->ve_start_virt);
 #else 
 	printk("[cedar]: memory allocated at PA: %016lX, VA: %016lX, CONV: %016lX\n", 
-		cedar_devp->ve_start, (ulong)cedar_devp->ve_start_virt, (ulong) phys_to_virt(cedar_devp->ve_start));
+																					cedar_devp->ve_start, 
+																					(ulong)cedar_devp->ve_start_virt, 
+																					(ulong) phys_to_virt(cedar_devp->ve_start));
+
+	printk("[cedar]: MACC regs allocated at %016lX\n", (ulong)cedar_devp->iomap_addrs.regs_macc);
+	printk("PAGE_OFFSET = %16lx\n", PAGE_OFFSET);
+	printk("PAGE_SHIFT = %d\n", PAGE_SHIFT);
+	printk("PAGE_MASK = %16lx\n", PAGE_MASK);
+	printk("PHYS_OFFSET = %16lx\n", PHYS_OFFSET);
 #endif
 
 #endif
