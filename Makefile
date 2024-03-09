@@ -1,22 +1,14 @@
-ifneq (${KERNELRELEASE},)
-	obj-m += cedar_ve.o
-else
-	ARCH=
-	ifneq (${ARCH},)
-		export ARCH
-	endif
+obj-m := cedar_ve.o
 
-	CROSS_COMPILE=
-	ifneq (${ARCH},)
-		export CROSS_COMPILE
-	endif
+SRC := $(shell pwd)
 
-	KERNEL_SOURCE=/usr/src/linux
-	PWD:=$(shell pwd)
+all:
+	$(MAKE) -C $(KERNEL_SRC) M=$(SRC)
 
-default:
-	${MAKE} -C ${KERNEL_SOURCE} M=${PWD} modules
+modules_install:
+	$(MAKE) -C $(KERNEL_SRC) M=$(SRC) modules_install
 
 clean:
-	${MAKE} -C ${KERNEL_SOURCE} M=${PWD} clean
-endif
+	rm -f *.o *~ core .depend .*.cmd *.ko *.mod.c
+	rm -f Module.markers Module.symvers modules.order
+	rm -rf .tmp_versions Modules.symvers
